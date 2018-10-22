@@ -7,8 +7,8 @@ import os
 import Adafruit_MCP3008
 
 # Combo arrays for combo unlock
-comboDir = [1,0,1]
-comboLog = [2,1,2]
+comboDir = [0,1,0]
+comboLog = [600.0,600.0,600.0]
 tic = 0
 delay = 150.0
 tolerance = 0.05
@@ -28,47 +28,65 @@ GPIO.setmode(GPIO.BCM)
 sec_mode = 5
 unsec_mode = 6
 
-def secure(channel):
+def callback_secure(channel):
 	global mode
 	mode = 0
-	#global mcp
+	print("Secure mode enabled.")
+	#GPIO.output(lock, GPIO.HIGH)
+
+def callback_unsecure(channel):
+	global mode
+	mode = 1
+	print("Insecure mode enabled.")
+
+def secure():
+	global log
+	global comboLog
+	global dir
+	global comboDir
 	#potVal = []
 	#potVal.append(ConvertVolts(mcp.read_adc(7), 4))
 	#potVal.pop(0)
 	#bef = [0]*16
 
-	#if ((comboLog == log) and (comboDir == dir)):
-	#	GPIO.output(unlock, GPIO.HIGH)
-	#	time.sleep(2)
-	#	GPIO.output(unlock, GPIO.LOW)
-	#else:
-	#	GPIO.output(lock, GPIO.HIGH)
-	#	time.sleep(2)
-	#	GPIO.output(lock, GPIO.LOW)
+	if ((comboLog == log) and (comboDir == dir)):
+	#if comboDir == dir:
+		GPIO.output(unlock, GPIO.HIGH)
+		time.sleep(2)
+		GPIO.output(unlock, GPIO.LOW)
+	else:
+		GPIO.output(lock, GPIO.HIGH)
+		time.sleep(2)
+		GPIO.output(lock, GPIO.LOW)
 
-def unsecure(channel):
-	global mode
-	mode = 1
-	#sort(combolog)
-	#sort(log)
-	#for i in range(len(combolog)):
-		# Check element-wise equality
-	#	if combolog[i] != log[i]:
-	#		# If not equal, blink LOCK, then break loop
-	#		GPIO.output(lock, GPIO.HIGH)
-	#		time.sleep(2)
-	#		GPIO.output(lock, GPIO.LOW)
-	#		break
-	#GPIO.output(unlock, GPIO.HIGH)
-	#time.sleep(2)
-	#GPIO.output(unlock, GPIO.LOW)
+def unsecure():
+	global log
+	global comboLog
+	sort(comboLog)
+	sort(log)
+	logs_equal = 1
+	for i in range(len(comboLog)):
+	#for i in range(len(comboDir)):
+		#Check element-wise equality
+		if comboLog[i] != log[i]:
+		#if comboDir[i] != dir[i]:
+			# If not equal, blink LOCK, then break loop
+			GPIO.output(lock, GPIO.HIGH)
+			time.sleep(2)
+			GPIO.output(lock, GPIO.LOW)
+			logs_equal = 0
+			break
+	if logs_equal!=0:
+		GPIO.output(unlock, GPIO.HIGH)
+		time.sleep(2)
+		GPIO.output(unlock, GPIO.LOW)
 
 
 # GPIO setup for buttons, set event detectors
 GPIO.setup(sec_mode, GPIO.IN, pull_up_down = GPIO.PUD_UP)
 GPIO.setup(unsec_mode, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-GPIO.add_event_detect(sec_mode, GPIO.FALLING, callback = secure, bouncetime = 500)
-GPIO.add_event_detect(unsec_mode, GPIO.FALLING, callback = unsecure, bouncetime = 500)
+GPIO.add_event_detect(sec_mode, GPIO.FALLING, callback = callback_secure, bouncetime = 500)
+GPIO.add_event_detect(unsec_mode, GPIO.FALLING, callback = callback_unsecure, bouncetime = 500)
 
 # Outputs
 lock = 13
@@ -146,11 +164,16 @@ def main():
 			global dir
 			v_read = ConvertVolts(mcp.read_adc(7), 4)
 			dir_curr = checkDir(v_before, v_read)
-			#if (dir_curr==2):
-				#twos = twos+1
+			if (dir_curr==2 and log):
+				twos = twos+1
 			if(dir_curr != 2 and dir_prev!=dir_curr and twos < 2000/delay):
+				if(dir_prev != 2):
+					log.append(tic*delay)
+					dir.append(dir_prev)
+					print("Timing (ms):", tic*delay,dir_prev) 
 				# start timer again
 				tic = 0
+				twos = 0
 				print("Current direction: ", dir_curr)
 
 				#print("Previous direction: ", dir_prev)
@@ -165,21 +188,32 @@ def main():
 				print("Direction: ", dir_prev)
 			#print(dir_curr)
 
-			if(mode == 0):
+			if(mode == 0 and twos > float(2000.0/delay)):
 					#secure mode
-					pass
-			if(mode == 1):
+					print("Done! Secure check initiated.")
+					print("Comparing to:")
+					print(comboLog, comboDir)
+					secure()
+					break
+			if(mode == 1 and twos > float(2000.0/delay)):
 					#unsecure mode
-					pass
+					print("Done! Insecure check initiated.")
+					print("Comparing to:")
+					print(comboLog, comboDir)
+					unsecure()
+					break
 			v_before = v_read
 			dir_prev = dir_curr
 			tic = tic+1
 #			print("TICK!")
 			time.sleep(float(delay/1000))
+		GPIO.cleanup()
 
 	except KeyboardInterrupt:
+		print(log)
+		print(dir)
 		GPIO.cleanup()
-		
-		
+
+
 if __name__ == "__main__":
 	main()

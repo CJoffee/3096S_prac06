@@ -5,13 +5,12 @@ import RPi.GPIO as GPIO
 import time
 import os
 import Adafruit_MCP3008
-
 # Combo arrays for combo unlock
 comboDir = [0,1,0]
-comboLog = [600.0,600.0,600.0]
+comboLog = [250.0,250.0,250.0]
 tic = 0
-delay = 150.0
-tolerance = 0.05
+delay = 50.0
+tolerance = 0.01
 
 # Log for 16 readings from potentiometer/Knob
 log = []	# Start empty
@@ -30,13 +29,21 @@ unsec_mode = 6
 
 def callback_secure(channel):
 	global mode
+	global log
+	global dir
 	mode = 0
+	log = []
+	dir = []
 	print("Secure mode enabled.")
 	#GPIO.output(lock, GPIO.HIGH)
 
 def callback_unsecure(channel):
 	global mode
+	global log
+	global dir
 	mode = 1
+	log = []
+	dir = []
 	print("Insecure mode enabled.")
 
 def secure():
@@ -48,13 +55,22 @@ def secure():
 	#potVal.append(ConvertVolts(mcp.read_adc(7), 4))
 	#potVal.pop(0)
 	#bef = [0]*16
-
-	if ((comboLog == log) and (comboDir == dir)):
+	true_flag = 1
+	#if ((comboLog == log) and (comboDir == dir)):
 	#if comboDir == dir:
+	if (len(log)!=len(comboLog)):
+		true_flag = 0
+	for i in range(0, len(comboLog)):
+		if abs(log[i]-comboLog[i])>delay:
+			true_flag = 0
+	if true_flag == 1:
+		print("Unlocked!")
 		GPIO.output(unlock, GPIO.HIGH)
 		time.sleep(2)
 		GPIO.output(unlock, GPIO.LOW)
 	else:
+		print("FAILED! System locked! Timings were:")
+		print(log)
 		GPIO.output(lock, GPIO.HIGH)
 		time.sleep(2)
 		GPIO.output(lock, GPIO.LOW)
@@ -62,21 +78,27 @@ def secure():
 def unsecure():
 	global log
 	global comboLog
+	global delay
 	sort(comboLog)
 	sort(log)
 	logs_equal = 1
 	for i in range(len(comboLog)):
 	#for i in range(len(comboDir)):
 		#Check element-wise equality
-		if comboLog[i] != log[i]:
+		if abs(comboLog[i]-log[i])>delay:
 		#if comboDir[i] != dir[i]:
 			# If not equal, blink LOCK, then break loop
 			GPIO.output(lock, GPIO.HIGH)
+			print("FAILED! System locked! Timings were:")
+			print(log)
+			print("Timings should've been: ")
+			print(comboLog)
 			time.sleep(2)
 			GPIO.output(lock, GPIO.LOW)
 			logs_equal = 0
 			break
 	if logs_equal!=0:
+		print("Unlocked!)
 		GPIO.output(unlock, GPIO.HIGH)
 		time.sleep(2)
 		GPIO.output(unlock, GPIO.LOW)
@@ -136,6 +158,7 @@ def sort(list):
                 i -= 1
             else:
                 break
+#    print(list)
     return list
 
 # Check direction pot is turning
@@ -157,6 +180,8 @@ def main():
 	twos = 0
 	global dir_prev
 	global tic
+
+	print("Twiddle Lock system started! Secure mode enabled by default.")
 	try:
 		while True:
 			#testlog = [0, 2, 1]
@@ -170,6 +195,9 @@ def main():
 				if(dir_prev != 2):
 					log.append(tic*delay)
 					dir.append(dir_prev)
+					if(len(log)>16):
+						log.pop(0)
+						dir.pop(0)
 					print("Timing (ms):", tic*delay,dir_prev) 
 				# start timer again
 				tic = 0
@@ -188,18 +216,18 @@ def main():
 				print("Direction: ", dir_prev)
 			#print(dir_curr)
 
-			if(mode == 0 and twos > float(2000.0/delay)):
+			if(mode == 0 and twos > float(2000.0/delay) and log):
 					#secure mode
 					print("Done! Secure check initiated.")
 					print("Comparing to:")
 					print(comboLog, comboDir)
 					secure()
 					break
-			if(mode == 1 and twos > float(2000.0/delay)):
+			if(mode == 1 and twos > float(2000.0/delay) and log):
 					#unsecure mode
 					print("Done! Insecure check initiated.")
-					print("Comparing to:")
-					print(comboLog, comboDir)
+					print("Sorting and comparing to:")
+					print(comboLog)
 					unsecure()
 					break
 			v_before = v_read

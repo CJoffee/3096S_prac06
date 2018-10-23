@@ -51,13 +51,7 @@ def secure():
 	global comboLog
 	global dir
 	global comboDir
-	#potVal = []
-	#potVal.append(ConvertVolts(mcp.read_adc(7), 4))
-	#potVal.pop(0)
-	#bef = [0]*16
 	true_flag = 1
-	#if ((comboLog == log) and (comboDir == dir)):
-	#if comboDir == dir:
 	if (len(log)!=len(comboLog)):
 		true_flag = 0
 	for i in range(0, len(comboLog)):
@@ -83,10 +77,8 @@ def unsecure():
 	sort(log)
 	logs_equal = 1
 	for i in range(len(comboLog)):
-	#for i in range(len(comboDir)):
 		#Check element-wise equality
 		if abs(comboLog[i]-log[i])>delay:
-		#if comboDir[i] != dir[i]:
 			# If not equal, blink LOCK, then break loop
 			GPIO.output(lock, GPIO.HIGH)
 			print("FAILED! System locked! Timings were:")
@@ -158,7 +150,6 @@ def sort(list):
                 i -= 1
             else:
                 break
-#    print(list)
     return list
 
 # Check direction pot is turning
@@ -184,7 +175,6 @@ def main():
 	print("Twiddle Lock system started! Secure mode enabled by default.")
 	try:
 		while True:
-			#testlog = [0, 2, 1]
 			global log
 			global dir
 			v_read = ConvertVolts(mcp.read_adc(7), 4)
@@ -203,19 +193,13 @@ def main():
 				tic = 0
 				twos = 0
 				print("Current direction: ", dir_curr)
-
-				#print("Previous direction: ", dir_prev)
-
 				print("Timer started!")
 			if(dir_curr == 2 and dir_prev!=dir_curr):
 				# stop timer
 				log.append(tic*delay)
 				dir.append(dir_prev)
-
 				print("Timing (ms): ", tic*delay)
 				print("Direction: ", dir_prev)
-			#print(dir_curr)
-
 			if(mode == 0 and twos > float(2000.0/delay) and log):
 					#secure mode
 					print("Done! Secure check initiated.")
@@ -233,7 +217,6 @@ def main():
 			v_before = v_read
 			dir_prev = dir_curr
 			tic = tic+1
-#			print("TICK!")
 			time.sleep(float(delay/1000))
 		GPIO.cleanup()
 
